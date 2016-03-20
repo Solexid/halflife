@@ -431,22 +431,19 @@ void CGrav::GrabThink()
 
 	cl = true;
 
-//CBaseEntity *ent = FindEntityForward4(m_pPlayer, 130);
+CBaseEntity *ent = FindEntityForward4(m_pPlayer, 130);
 	
 
 	if (failtraces<50&& temp)
 	{
-		if (temp->IsAlive()) {
-			if ((temp->pev->origin - m_pPlayer->pev->origin).Length()>250) { failtraces += 1; }
-			else { failtraces = 0; }
+		if (ent!=temp) { failtraces += 1; }
+		else { failtraces = 0; }
+		
+		UpdateEffect(pev->origin, temp->pev->origin, 1);
 
-			UpdateEffect(pev->origin, temp->pev->origin, 1);
-
-			Pull(temp, 100);
-
-			pev->nextthink = gpGlobals->time + 0.001;
-		}
-		else { failtraces += 50; }
+		Pull(temp,100 );
+	
+		pev->nextthink = gpGlobals->time + 0.001;
 	}
 	else{
 		EMIT_SOUND_DYN(ENT(pev), CHAN_VOICE, GRAV_SOUND_OFF, 1, ATTN_NORM, 0, 70 + RANDOM_LONG(0, 34));
