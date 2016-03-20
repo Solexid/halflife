@@ -4,6 +4,7 @@ Created by Solexid
 ****/
 
 
+
 #include "extdll.h"
 #include "util.h"
 #include "cbase.h"
@@ -25,7 +26,6 @@ Created by Solexid
 #define GRAV_SOUND_STARTUP		"weapons/gauss2.wav"
 #define WEAPON_GRAVGUN 17
 #define EGON_SWITCH_NARROW_TIME			0.75			// Time it takes to switch fire modes
-#define EGON_SWITCH_WIDE_TIME			1.5
 
 enum gauss_e {
 	GAUSS_IDLE = 0,
@@ -49,10 +49,11 @@ public:
 	int iItemSlot(void) { return 4; }
 	int GetItemInfo(ItemInfo *p);
 	int AddToPlayer(CBasePlayer *pPlayer);
-	bool cl;
+	bool cl=false;
 	BOOL Deploy(void);
 	void Holster(int skiplocal = 0);
-
+	int failtraces = 0;
+	CBaseEntity* temp;
 	void UpdateEffect(const Vector &startPoint, const Vector &endPoint, float timeBlend);
 	CBaseEntity *	FindEntityForward4(CBaseEntity *pMe, float radius);
 	void CreateEffect(void);
@@ -67,19 +68,16 @@ public:
 	void Pull(CBaseEntity* ent, float force);
 	void GravAnim(int iAnim, int skiplocal, int body);
 	float mytime = gpGlobals->time;
-	void Grab(CBaseEntity* ent);
 	float m_flAmmoUseTime;// since we use < 1 point of ammo per update, we subtract ammo on a timer.
 
-	float GetPulseInterval(void);
-	float GetDischargeInterval(void);
+
 	void GrabThink(void);
 	void Fire(const Vector &vecOrigSrc, const Vector &vecDir);
 
 	BOOL HasAmmo(void);
-	CBaseEntity* temp;
-	void UseAmmo(int count);
 
-	enum EGON_FIREMODE { FIRE_NARROW, FIRE_WIDE };
+
+	enum GRAV_FIREMODE { FIRE_NARROW, FIRE_WIDE };
 
 	CBeam				*m_pBeam;
 	CBeam				*m_pNoise;
@@ -98,7 +96,7 @@ public:
 
 private:
 	float				m_shootTime;
-	EGON_FIREMODE		m_fireMode;
+	GRAV_FIREMODE		m_fireMode;
 	float				m_shakeTime;
 	BOOL				m_deployed;
 
@@ -139,8 +137,6 @@ void CGrav::Precache(void)
 
 	PRECACHE_SOUND("weapons/357_cock1.wav");
 
-	m_usEgonFire = PRECACHE_EVENT(1, "events/egon_fire.sc");
-	m_usEgonStop = PRECACHE_EVENT(1, "events/egon_stop.sc");
 }
 
 
@@ -192,23 +188,13 @@ p->pszAmmo1 = NULL;
 	p->iPosition = 1;
 	p->iId = m_iId = WEAPON_GRAVGUN;
 	p->iFlags = 0;
-	p->iWeight = EGON_WEIGHT;
+	p->iWeight = 20;
 
 	return 1;
 }
 
-#define EGON_PULSE_INTERVAL			0.1
-#define EGON_DISCHARGE_INTERVAL		0.1
 //#define USEGUN 1
-float CGrav::GetPulseInterval(void)
-{
-	return EGON_PULSE_INTERVAL;
-}
 
-float CGrav::GetDischargeInterval(void)
-{
-	return EGON_DISCHARGE_INTERVAL;
-}
 
 BOOL CGrav::HasAmmo(void)
 {
@@ -216,10 +202,6 @@ BOOL CGrav::HasAmmo(void)
 	return TRUE;
 }
 
-void CGrav::UseAmmo(int count)
-{
-	
-}
 
 
 void CGrav::Attack(void)
@@ -255,8 +237,7 @@ void CGrav::Attack(void)
 
 		if (pev->fuser1 <= gpGlobals->time)
 		{
-			//	PLAYBACK_EVENT_FULL(flags, m_pPlayer->edict(), m_usEgonFire, 0, (float *)&g_vecZero, (float *)&g_vecZero, 0.0, 0.0, m_fireState, m_fireMode, 0, 0);
-			GravAnim(GAUSS_SPIN, 1, 0);
+				GravAnim(GAUSS_SPIN, 1, 0);
 			pev->fuser1 = 1000;
 			SetThink(NULL);
 		}
@@ -352,8 +333,7 @@ void CGrav::Attack2(void)
 
 						if (pev->fuser1 <= gpGlobals->time)
 						{
-						//	PLAYBACK_EVENT_FULL(flags, m_pPlayer->edict(), m_usEgonFire, 0, (float *)&g_vecZero, (float *)&g_vecZero, 0.0, 0.0, m_fireState, m_fireMode, 0, 0);
-							
+								
 							pev->fuser1 = 1000;
 						}
 						CBaseEntity* crosent;
@@ -443,8 +423,7 @@ CBaseEntity*  CGrav::FindEntityForward4(CBaseEntity *pMe,float radius)
 	return NULL;
 }
 //Failure traces counter for GrabThink
-int failtraces = 0;
-CBaseEntity* temp;
+
 //Used for prop grab and 
 void CGrav::GrabThink()
 {
@@ -452,11 +431,12 @@ void CGrav::GrabThink()
 
 	cl = true;
 
-	CBaseEntity *ent = FindEntityForward4(m_pPlayer, 130);
+//CBaseEntity *ent = FindEntityForward4(m_pPlayer, 130);
+	
 
-	if (failtraces<50&& (temp))
+	if (failtraces<50&& (temp->IsAlive()))
 	{
-		if (ent != temp) { failtraces += 1; }
+		if ((temp->pev->origin - m_pPlayer->pev->origin).Length()>250) { failtraces += 1; }
 		else { failtraces = 0; }
 		
 		UpdateEffect(pev->origin, temp->pev->origin, 1);
@@ -544,7 +524,7 @@ void CGrav::Pull(CBaseEntity* ent,float force){
 
 
 
-bool cl = false;
+
 void CGrav::PrimaryAttack(void)
 {
 	if (mytime < gpGlobals->time)
@@ -617,32 +597,7 @@ void CGrav::Fire(const Vector &vecOrigSrc, const Vector &vecDir)
 
 
 #ifndef CLIENT_DLL
-		if (pev->dmgtime < gpGlobals->time)
-		{
-			// Narrow mode only does damage to the entity it hits
-		
-
-			if (g_pGameRules->IsMultiplayer())
-			{
-				// multiplayer uses 1 ammo every 1/10th second
-				if (gpGlobals->time >= m_flAmmoUseTime)
-				{
-					
-					m_flAmmoUseTime = gpGlobals->time + 1.2;
-				}
-			}
-			else
-			{
-				// single player, use 3 ammo/second
-				if (gpGlobals->time >= m_flAmmoUseTime)
-				{
-					UseAmmo(1);
-					m_flAmmoUseTime = gpGlobals->time + 0.166;
-				}
-			}
-
-			pev->dmgtime = gpGlobals->time + GetPulseInterval();
-		}
+	
 #endif
 		
 	
@@ -796,8 +751,6 @@ void CGrav::EndAttack(void)
 	}
 	if (m_fireState != FIRE_OFF) //Checking the button just in case!.
 		bMakeNoise = true;
-
-	//PLAYBACK_EVENT_FULL(FEV_GLOBAL | FEV_RELIABLE, m_pPlayer->edict(), m_usEgonStop, 0, (float *)&m_pPlayer->pev->origin, (float *)&m_pPlayer->pev->angles, 0.0, 0.0, bMakeNoise, 0, 0, 0);
 	mytime = gpGlobals->time + 0.1;
 	m_flTimeWeaponIdle = gpGlobals->time + 0.2;
 	m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->time + 0.1;
