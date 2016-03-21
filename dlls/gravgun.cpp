@@ -50,6 +50,7 @@ public:
 	int GetItemInfo(ItemInfo *p);
 	int AddToPlayer(CBasePlayer *pPlayer);
 	bool cl=false;
+	int lastbutton = 0;
 	BOOL Deploy(void);
 	void Holster(int skiplocal = 0);
 	int failtraces = 0;
@@ -109,6 +110,7 @@ void CGrav::Spawn()
 {
 	pev->classname = MAKE_STRING("weapon_gravgun"); // hack to allow for old names
 	Precache();
+	lastbutton = (IN_ATTACK2);
 	m_iId = WEAPON_GRAVGUN;
 	SET_MODEL(ENT(pev), "models/w_gravcannon.mdl");
 	m_iClip = -1;
@@ -431,6 +433,7 @@ void CGrav::GrabThink()
 
 	cl = true;
 
+	lastbutton = m_pPlayer->pev->button;
 	//CBaseEntity *ent = FindEntityForward4(m_pPlayer, 130);
 
 
@@ -525,14 +528,16 @@ void CGrav::Pull(CBaseEntity* ent,float force){
 		ent->pev->velocity = ((target - VecBModelOrigin(ent->pev))).Normalize() * 900;
 		}
 		ent->pev->velocity = ent->pev->velocity + m_pPlayer->pev->velocity;
-		if (force <50) {
-			mytime = gpGlobals->time + 0.7;
-			m_flTimeWeaponIdle = gpGlobals->time + 0.7;
-			m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->time + 0.5;
+		if (force<50) {
+			
+			//mytime = gpGlobals->time + 1.7;
+			m_flTimeWeaponIdle = gpGlobals->time + 0.1;
+			//m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->time + 0.5;
 
 			m_fireState = FIRE_OFF;
 			pev->nextthink = gpGlobals->time + 0.00001;
 			SetThink(&CGrav::GrabThink);
+			
 		}
 	}
 	//target.z = target.z + 34;
@@ -548,6 +553,7 @@ void CGrav::Pull(CBaseEntity* ent,float force){
 
 void CGrav::PrimaryAttack(void)
 {
+	lastbutton = m_pPlayer->pev->button;
 	if (mytime < gpGlobals->time)
 	{
 	
@@ -564,8 +570,9 @@ void CGrav::SecondaryAttack(void)
 {
 	if (mytime < gpGlobals->time)
 	{
-		if (cl)
+		if (cl&&!(lastbutton &(IN_ATTACK2)))
 		{
+		
 			if (m_fireState == FIRE_CHARGE)
 				return;
 			EndAttack();
@@ -577,6 +584,7 @@ void CGrav::SecondaryAttack(void)
 			temp = NULL;
 		}
 		else {
+			lastbutton= m_pPlayer->pev->button ;
 			m_fireMode = FIRE_NARROW;
 			Attack2();
 		}
@@ -733,6 +741,7 @@ void CGrav::WeaponIdle(void)
 
 void CGrav::EndAttack(void)
 {
+	
 	bool bMakeNoise = false;
 	if (temp&&temp->pev->velocity.Length() > 100&& (temp->pev->origin-m_pPlayer->pev->origin).Length()<100) { temp->pev->velocity = temp->pev->velocity / 10; }
 	if (temp) {
