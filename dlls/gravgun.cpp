@@ -306,7 +306,7 @@ void CGrav::GravAnim(int iAnim, int skiplocal, int body)
 
 void CGrav::Attack2(void)
 {
-	if (temp) { temp = NULL; }
+
 
 	UTIL_MakeVectors(m_pPlayer->pev->v_angle + m_pPlayer->pev->punchangle);
 	Vector vecAiming = gpGlobals->v_forward;
@@ -476,7 +476,7 @@ void CGrav::Pull(CBaseEntity* ent,float force){
 
 	Vector target = m_pPlayer->pev->origin  + gpGlobals->v_forward  * 75;
 	target.z += 32;
-	if (force < 50&& (target - VecBModelOrigin(ent->pev)).Length()>130){
+	if ( (target - VecBModelOrigin(ent->pev)).Length()>110){
 		target = m_pPlayer->pev->origin  + gpGlobals->v_forward *110 ;
 		
 		
@@ -507,6 +507,7 @@ void CGrav::Pull(CBaseEntity* ent,float force){
 		ALERT(at_console, "%s 2: %f\n", STRING(ent->pev->classname), ent->pev->velocity.Length());
 	}
 	else {
+	
 		Vector atarget = UTIL_VecToAngles(gpGlobals->v_forward);
 
 
@@ -518,12 +519,21 @@ void CGrav::Pull(CBaseEntity* ent,float force){
 		ent->pev->avelocity.z = UTIL_AngleDiff(atarget.z, ent->pev->angles.z) * 100;
 		
 		ent->pev->velocity = (target - VecBModelOrigin(ent->pev))* 100;
+
 		if(ent->pev->velocity.Length()>1100){
 	
 		ent->pev->velocity = ((target - VecBModelOrigin(ent->pev))).Normalize() * 900;
 		}
 		ent->pev->velocity = ent->pev->velocity + m_pPlayer->pev->velocity;
-		
+		if (force <50) {
+			mytime = gpGlobals->time + 0.7;
+			m_flTimeWeaponIdle = gpGlobals->time + 0.7;
+			m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->time + 0.5;
+
+			m_fireState = FIRE_OFF;
+			pev->nextthink = gpGlobals->time + 0.00001;
+			SetThink(&CGrav::GrabThink);
+		}
 	}
 	//target.z = target.z + 34;
 	//target.x = target.y + 10;
@@ -560,7 +570,7 @@ void CGrav::SecondaryAttack(void)
 				return;
 			EndAttack();
 			SetThink(NULL);
-			mytime = gpGlobals->time + 0.1;
+			mytime = gpGlobals->time + 0.5;
 			//m_flTimeWeaponIdle = gpGlobals->time + 0.1;
 			cl = false;
 			temp->pev->velocity = Vector(0, 0, 0);
@@ -726,7 +736,7 @@ void CGrav::EndAttack(void)
 	bool bMakeNoise = false;
 	if (temp&&temp->pev->velocity.Length() > 100&& (temp->pev->origin-m_pPlayer->pev->origin).Length()<100) { temp->pev->velocity = temp->pev->velocity / 10; }
 	if (temp) {
-		pev->nextthink = gpGlobals->time + 0.05;
+		pev->nextthink = gpGlobals->time + 0.00001;
 		SetThink(&CGrav::GrabThink);
 	}
 	if (m_fireState != FIRE_OFF) //Checking the button just in case!.
